@@ -1,0 +1,19 @@
+# Byte-compiled / optimized files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Environment and Secrets (CRITICAL)
+.env
+.env.*
+!.env.example
+
+# Docker volume state / local data
+*.log
+.coverage
+.pytest_cache/

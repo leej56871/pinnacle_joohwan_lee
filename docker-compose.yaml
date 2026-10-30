@@ -1,0 +1,95 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: tx_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-tx_db}
+      POSTGRES_USER: ${POSTGRES_USER:-tx_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tx_password}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - tx_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tx_user} -d ${POSTGRES_DB:-tx_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1024M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    networks:
+      - tx_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: tx_redis
+    restart: unless-stopped
+    # Limit Redis internal memory below the container limit to prevent OOM-killer termination
+    command: >
+      redis-server 
+      --appendonly yes 
+      --maxmemory 384mb 
+      --maxmemory-policy allkeys-lru
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - tx_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    networks:
+      - tx_net
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tx_app
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-tx_user}:${POSTGRES_PASSWORD:-tx_password}@postgres:5432/${POSTGRES_DB:-tx_db}
+      REDIS_URL: redis://redis:6379/0
+      PORT: ${APP_PORT:-8000}
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 1024M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    networks:
+      - tx_net
+
+volumes:
+  tx_pgdata:
+  tx_redisdata:
+
+networks:
+  tx_net:
+    driver: bridge

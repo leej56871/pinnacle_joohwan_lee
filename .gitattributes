@@ -1,0 +1,9 @@
+# To force LF and prevent CRLF from Windows
+
+*.sh text eol=lf
+*.sql text eol=lf
+*.py text eol=lf
+*.lua text eol=lf
+Dockerfile text eol=lf
+docker-compose.yml text eol=lf
+requirements.txt text eol=lf
